@@ -79,4 +79,20 @@ describe("WhatsAppClient", () => {
     expect([...r.bytes]).toEqual([1, 2, 3]);
     expect(calls.map((c) => c.url)).toEqual(["https://waba-v2.360dialog.io/MEDIA1", "https://waba-v2.360dialog.io/path?x=1"]);
   });
+
+  it("never sends the API key to a host it doesn't trust", async () => {
+    const { fn, calls } = fakeFetch([json(200, { url: "https://attacker.example.com/steal", mime_type: "image/jpeg" })]);
+    const client = new WhatsAppClient(providerFor(cfg({ WA_PROVIDER: "meta", WA_PHONE_NUMBER_ID: "1" })), { fetch: fn });
+    await expect(client.downloadMedia("M1")).rejects.toThrow(/refusing to send credentials to https:\/\/attacker.example.com/);
+    expect(calls.map((c) => c.url)).toEqual(["https://graph.facebook.com/v23.0/M1"]);
+  });
+
+  it("allows Meta's media hosts", async () => {
+    const { fn } = fakeFetch([
+      json(200, { url: "https://lookaside.fbsbx.com/whatsapp_business/attachments/?mid=1", mime_type: "image/jpeg" }),
+      new Response(new Uint8Array([1]), { status: 200 }),
+    ]);
+    const client = new WhatsAppClient(providerFor(cfg({ WA_PROVIDER: "meta", WA_PHONE_NUMBER_ID: "1" })), { fetch: fn });
+    expect((await client.downloadMedia("M1")).bytes.length).toBe(1);
+  });
 });

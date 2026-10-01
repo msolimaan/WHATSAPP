@@ -14,6 +14,8 @@ export interface Provider {
   /** Rewrites the download url from media metadata so it goes through the provider when needed. */
   downloadUrl(url: string): string;
   headers: Record<string, string>;
+  /** Hosts this client may send the API key to; anything else is refused. */
+  allowedHosts: string[];
   /** List and create message templates. Undefined when not configured (Meta needs the WABA id). */
   templatesUrl?: string;
   templateDeleteUrl?(name: string): string;
@@ -47,6 +49,8 @@ export function providerFor(config: Config): Provider {
       mediaInfoUrl: (id) => `${root}/${encodeURIComponent(id)}`,
       downloadUrl: (url) => url,
       headers: { Authorization: `Bearer ${config.WA_API_KEY}` },
+      // Graph API, plus where Meta serves media downloads.
+      allowedHosts: [new URL(base).hostname, "fbsbx.com", "facebook.com", "whatsapp.net", "fbcdn.net"],
       ...(config.WA_BUSINESS_ACCOUNT_ID && {
         templatesUrl: `${root}/${config.WA_BUSINESS_ACCOUNT_ID}/message_templates`,
         templateDeleteUrl: (name: string) =>
@@ -68,6 +72,7 @@ export function providerFor(config: Config): Provider {
       return u.toString();
     },
     headers: { "D360-API-KEY": config.WA_API_KEY },
+    allowedHosts: [new URL(base).hostname],
     templatesUrl: `${base}/v1/configs/templates`,
     templateDeleteUrl: (name) => `${base}/v1/configs/templates/${encodeURIComponent(name)}`,
   };
@@ -177,6 +182,11 @@ export class WhatsAppClient {
     url: string,
     opts: { method: string; json?: unknown; form?: FormData },
   ): Promise<Response> {
+    // URLs can come back from the API (media downloads, next pages). Never send the key elsewhere.
+    const host = new URL(url).hostname;
+    if (new URL(url).protocol !== "https:" || !this.provider.allowedHosts.some((h) => host === h || host.endsWith(`.${h}`))) {
+      throw new WhatsAppApiError(0, undefined, `refusing to send credentials to ${new URL(url).origin}`);
+    }
     for (let attempt = 0; ; attempt++) {
       const headers: Record<string, string> = { ...this.provider.headers };
       let body: BodyInit | undefined;

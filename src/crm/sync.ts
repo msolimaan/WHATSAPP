@@ -301,6 +301,7 @@ export class CrmSync {
     let name = "not a lead (no card will be created)";
     if (cardRef) {
       const short = cardRef.match(/trello\.com\/c\/([A-Za-z0-9]+)/)?.[1] ?? cardRef.trim();
+      if (!/^[A-Za-z0-9]{1,32}$/.test(short)) throw new Error("Give the card's Trello URL (https://trello.com/c/…) or id.");
       const card = await this.deps.trello.getCard(short);
       const board = await this.getBoard();
       if (!board.cards.has(card.id)) throw new Error("That card isn't on the CRM board.");

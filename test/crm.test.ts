@@ -332,6 +332,11 @@ describe("CRM sync: live", () => {
     expect(cardList("luma")).toBe("L_contacted");
   });
 
+  it("only accepts real card links", async () => {
+    await expect(sync.link("+55 11 95555-0000", "../members/me")).rejects.toThrow(/Trello URL/);
+    expect(trello.writes).toEqual([]);
+  });
+
   it("records failures instead of crashing", async () => {
     await sync.getBoard(0);
     trello.cards.splice(trello.cards.findIndex((c) => c.id === "luma"), 1); // card deleted on Trello since
