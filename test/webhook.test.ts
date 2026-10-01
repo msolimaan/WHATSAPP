@@ -81,6 +81,13 @@ describe("processWebhook", () => {
     expect(store.getContact("5511990001111")!.saved_name).toBe("Estúdio Barro Azul");
   });
 
+  it("prunes old raw deliveries but keeps the messages", () => {
+    processWebhook(store, bus, f.inboundText);
+    store.db.prepare("UPDATE webhook_events SET received_at = 0").run();
+    expect(store.pruneWebhookEvents(30)).toBe(1);
+    expect(store.getMessage("wamid.IN1")).toBeDefined();
+  });
+
   it("lists a chat newest first and finds messages by full-text search", () => {
     processWebhook(store, bus, f.echo);
     processWebhook(store, bus, f.inboundText);
@@ -139,6 +146,6 @@ describe("webhook HTTP endpoint", () => {
     processWebhook(store, bus, f.inboundText);
     const app = createApp(deps({ ...base, WA_APP_SECRET: "s" }));
     const res = await request(app).get("/health").expect(200);
-    expect(res.body).toMatchObject({ ok: true, messages: 1 });
+    expect(res.body).toEqual({ ok: true });
   });
 });

@@ -15,7 +15,9 @@ export const testConfig = (over: Partial<Config> = {}) =>
     PORT: 0, DATA_DIR: "", TIMEZONE: "America/Sao_Paulo", WA_PROVIDER: "360dialog", WA_API_KEY: "KEY",
     WA_GRAPH_VERSION: "v23.0", WEBHOOK_VERIFY_TOKEN: "verify-me", TRELLO_BOARD_ID: "B1",
     CRM_FOLLOW_UP_DAYS: 3, CRM_NEW_LEAD_LOOKBACK_DAYS: 30, CRM_CHANNEL_LABEL: "WP",
-    FOLLOWUP_QUIET_HOURS: "20:00-08:30", FOLLOWUP_SKIP_WEEKENDS: false, FOLLOWUP_DAILY_TEMPLATE_CAP: 30, ...over,
+    FOLLOWUP_QUIET_HOURS: "20:00-08:30", FOLLOWUP_SKIP_WEEKENDS: false, FOLLOWUP_DAILY_TEMPLATE_CAP: 30,
+    OAUTH_ALLOWED_REDIRECT_HOSTS: ["claude.ai", "claude.com", "localhost", "127.0.0.1"],
+    OAUTH_ACCESS_TOKEN_TTL_MINUTES: 60, OAUTH_REFRESH_TOKEN_TTL_DAYS: 30, ...over,
   }) as Config;
 
 export interface FakeCall { method: string; url: string; body: unknown }

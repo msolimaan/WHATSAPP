@@ -125,6 +125,11 @@ export class Store {
     return Number(r.lastInsertRowid);
   }
 
+  /** Deletes raw webhook deliveries older than `days` (the parsed messages are kept). */
+  pruneWebhookEvents(days = 30): number {
+    return this.db.prepare(`DELETE FROM webhook_events WHERE received_at < ?`).run(now() - days * 86400).changes;
+  }
+
   setWebhookError(id: number, error: string): void {
     this.db.prepare(`UPDATE webhook_events SET error = ? WHERE id = ?`).run(error, id);
   }

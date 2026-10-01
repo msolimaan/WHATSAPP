@@ -4,8 +4,8 @@ Connects Claude to your WhatsApp Business number through the official Cloud API
 (Coexistence via a Meta partner such as 360dialog, or Meta directly), and keeps the
 **Inhouse Creatives LEADS** Trello board in sync automatically.
 
-> Status: **stage 4 of 7.** Webhook intake, message store, WhatsApp tools, the Trello sync and
-> follow-ups work. OAuth and deployment come in the next stages.
+> Status: **stage 5 of 7.** Everything works locally, including OAuth for Claude apps.
+> Deployment files and the setup guide come next.
 
 ## What works now
 - `POST /webhook/<secret>` receives these webhooks, stores them, and skips duplicates:
@@ -38,8 +38,23 @@ Connects Claude to your WhatsApp Business number through the official Cloud API
 Every send goes through one place, which refuses free text outside the 24-hour window, refuses templates to
 people who opted out, and stores the message so it shows in the chat history.
 
-Until OAuth lands (stage 5), `/mcp` needs `Authorization: Bearer $MCP_BEARER_TOKEN`, e.g.
-`claude mcp add --transport http whatsapp https://<host>/mcp --header "Authorization: Bearer <token>"`.
+### Connecting Claude
+With `PUBLIC_BASE_URL` and `OWNER_PASSWORD` set, the server is its own OAuth 2.1 login server:
+- dynamic client registration;
+- PKCE;
+- the standard `/.well-known` discovery documents.
+
+**How a Claude app connects:**
+- **claude.ai, Claude Desktop and the phone app:** Settings → Connectors → Add custom connector → `https://<host>/mcp`. A page asks for your owner password, then the app is connected.
+- **Claude Code:** `claude mcp add --transport http whatsapp https://<host>/mcp` (OAuth), or add `--header "Authorization: Bearer $MCP_BEARER_TOKEN"` to use the static token.
+
+**Safeguards:**
+- Only hosts in `OAUTH_ALLOWED_REDIRECT_HOSTS` (claude.ai, claude.com, local apps) can receive a login.
+- Codes and tokens are stored as SHA-256 hashes.
+- Access tokens last 60 minutes. Refresh tokens are single-use, and reusing one signs that login out everywhere.
+- Tokens only work for this server's `/mcp`.
+- Wrong passwords are limited to 10 per 15 minutes per address. Logins pause after 20 failures in an hour from anywhere.
+- The login page can't be framed and loads nothing from outside.
 
 ## Trello CRM sync
 The server keeps the **Inhouse Creatives LEADS** board in step with WhatsApp:

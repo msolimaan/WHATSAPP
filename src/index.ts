@@ -17,6 +17,8 @@ const client = new WhatsAppClient(providerFor(config));
 const messenger = new Messenger(client, store, bus);
 const followups = new FollowupEngine({ config, store, bus, messenger });
 followups.start();
+// Raw webhook payloads are only kept long enough to replay a parsing fix.
+setInterval(() => store.pruneWebhookEvents(30), 24 * 3600 * 1000).unref();
 
 let crm: CrmSync | undefined;
 if (config.TRELLO_API_KEY && config.TRELLO_TOKEN) {

@@ -1,4 +1,5 @@
 import express, { type Express } from "express";
+import { setupAuth } from "./auth/router.js";
 import type { Config } from "./config.js";
 import type { CrmSync } from "./crm/sync.js";
 import type { FollowupEngine } from "./followups/engine.js";
@@ -25,19 +26,20 @@ export function createApp(deps: AppDeps): Express {
   app.disable("x-powered-by");
   app.set("trust proxy", 1);
 
-  app.get("/health", (_req, res) => {
-    const row = store.db.prepare("SELECT COUNT(*) AS n, MAX(timestamp) AS last FROM messages").get() as {
-      n: number;
-      last: number | null;
-    };
-    res.json({
-      ok: true,
-      messages: row.n,
-      lastMessageAt: row.last ? new Date(row.last * 1000).toISOString() : null,
-    });
+  app.use((_req, res, next) => {
+    res.set({ "X-Content-Type-Options": "nosniff", "Referrer-Policy": "no-referrer" });
+    next();
   });
 
+  // Public, so it says nothing about your messages: just that the server and database are up.
+  app.get("/health", (_req, res) => {
+    store.db.prepare("SELECT 1").get();
+    res.json({ ok: true });
+  });
+
+  const auth = setupAuth(config, store.db);
+  if (auth.router) app.use(auth.router);
   app.use("/webhook", webhookRouter(config, store, bus));
-  app.use("/mcp", mcpRouter(deps));
+  app.use("/mcp", mcpRouter(deps, auth.guard));
   return app;
 }

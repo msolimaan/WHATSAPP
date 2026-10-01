@@ -145,6 +145,42 @@ const MIGRATIONS: string[] = [
   );
   CREATE INDEX followup_events_by_time ON followup_events (at);
   `,
+  `
+  -- OAuth for Claude apps. Codes and tokens are stored as SHA-256 hashes, never in the clear.
+  CREATE TABLE oauth_clients (
+    client_id  TEXT PRIMARY KEY,
+    info       TEXT NOT NULL,                -- JSON client registration
+    created_at INTEGER NOT NULL
+  );
+
+  -- An authorization waiting for the owner's password.
+  CREATE TABLE oauth_pending (
+    id         TEXT PRIMARY KEY,             -- hash of the id in the login form
+    client_id  TEXT NOT NULL,
+    params     TEXT NOT NULL,                -- JSON {redirectUri, codeChallenge, state, scopes, resource}
+    expires_at INTEGER NOT NULL
+  );
+
+  CREATE TABLE oauth_codes (
+    code_hash  TEXT PRIMARY KEY,
+    client_id  TEXT NOT NULL,
+    params     TEXT NOT NULL,
+    expires_at INTEGER NOT NULL
+  );
+
+  CREATE TABLE oauth_tokens (
+    token_hash TEXT PRIMARY KEY,
+    kind       TEXT NOT NULL CHECK (kind IN ('access', 'refresh')),
+    client_id  TEXT NOT NULL,
+    family     TEXT NOT NULL,                -- one login; all its tokens are revoked together
+    scopes     TEXT NOT NULL,
+    resource   TEXT,
+    expires_at INTEGER NOT NULL,
+    used       INTEGER NOT NULL DEFAULT 0,   -- refresh tokens are single-use
+    created_at INTEGER NOT NULL
+  );
+  CREATE INDEX oauth_tokens_family ON oauth_tokens (family);
+  `,
 ];
 
 export function openDb(file: string): DB {

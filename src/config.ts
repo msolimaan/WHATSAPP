@@ -9,8 +9,18 @@ const schema = z
     DATA_DIR: z.string().default("./data"),
     // Your time zone, used for dates Claude shows you and (later) quiet hours.
     TIMEZONE: z.string().default("America/Sao_Paulo"),
-    // Temporary MCP access until OAuth lands: clients send "Authorization: Bearer <token>".
+    // Static access for clients that support custom headers (Claude Code):
+    // "Authorization: Bearer <token>". Optional when OAuth is set up.
     MCP_BEARER_TOKEN: z.string().min(32, "use at least 32 random characters").optional(),
+    // OAuth login for claude.ai, Claude Desktop and the phone app. Needs PUBLIC_BASE_URL too.
+    OWNER_PASSWORD: z.string().min(12, "use at least 12 characters").optional(),
+    // Where approved logins may be sent back to (host names; subdomains included).
+    OAUTH_ALLOWED_REDIRECT_HOSTS: z
+      .string()
+      .default("claude.ai,claude.com,localhost,127.0.0.1")
+      .transform((s) => s.split(",").map((h) => h.trim().toLowerCase()).filter(Boolean)),
+    OAUTH_ACCESS_TOKEN_TTL_MINUTES: z.coerce.number().int().min(5).max(24 * 60).default(60),
+    OAUTH_REFRESH_TOKEN_TTL_DAYS: z.coerce.number().int().min(1).max(365).default(30),
 
     // "meta" talks to graph.facebook.com directly; "360dialog" to its Cloud API proxy.
     // Both use Meta's message and webhook formats.
@@ -56,6 +66,12 @@ const schema = z
   .superRefine((c, ctx) => {
     if (c.WA_PROVIDER === "meta" && !c.WA_PHONE_NUMBER_ID) {
       ctx.addIssue({ code: "custom", path: ["WA_PHONE_NUMBER_ID"], message: "required when WA_PROVIDER=meta" });
+    }
+    if (c.OWNER_PASSWORD && !c.PUBLIC_BASE_URL) {
+      ctx.addIssue({ code: "custom", path: ["PUBLIC_BASE_URL"], message: "required for OAuth (set it to this server's https URL)" });
+    }
+    if (c.PUBLIC_BASE_URL && !c.PUBLIC_BASE_URL.startsWith("https://") && !/^http:\/\/(localhost|127\.0\.0\.1)(:|\/|$)/.test(c.PUBLIC_BASE_URL)) {
+      ctx.addIssue({ code: "custom", path: ["PUBLIC_BASE_URL"], message: "must be https:// (http only for localhost)" });
     }
     if (Boolean(c.TRELLO_API_KEY) !== Boolean(c.TRELLO_TOKEN)) {
       ctx.addIssue({ code: "custom", path: ["TRELLO_TOKEN"], message: "set both TRELLO_API_KEY and TRELLO_TOKEN, or neither" });

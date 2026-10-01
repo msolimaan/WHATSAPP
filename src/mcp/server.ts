@@ -1,7 +1,6 @@
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { StreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/streamableHttp.js";
-import express, { type Request, type Response, type Router } from "express";
-import { safeEqual } from "../webhook/signature.js";
+import express, { type Request, type RequestHandler, type Response, type Router } from "express";
 import type { ToolContext } from "./context.js";
 import { registerCrmTools } from "./tools/crm.js";
 import { registerFollowupTools } from "./tools/followups.js";
@@ -33,22 +32,18 @@ export function buildMcpServer(ctx: ToolContext): McpServer {
 
 /**
  * Stateless Streamable HTTP: a fresh server and transport per request, JSON responses.
- * Access is a static bearer token for now; OAuth for claude.ai connectors replaces it in stage 5.
+ * `guard` checks the caller's token (OAuth for Claude apps, or the static bearer token).
  */
-export function mcpRouter(ctx: ToolContext): Router {
+export function mcpRouter(ctx: ToolContext, guard?: RequestHandler): Router {
   const router = express.Router();
-  const token = ctx.config.MCP_BEARER_TOKEN;
-
-  router.use((req, res, next) => {
-    if (!token) {
-      return res.status(503).json({ error: "MCP access isn't configured. Set MCP_BEARER_TOKEN." });
-    }
-    const header = req.header("authorization") ?? "";
-    if (!header.startsWith("Bearer ") || !safeEqual(header.slice(7), token)) {
-      return res.status(401).set("WWW-Authenticate", 'Bearer realm="whatsapp-mcp"').json({ error: "unauthorized" });
-    }
-    next();
-  });
+  router.use(
+    guard ??
+      ((_req, res) => {
+        res.status(503).json({
+          error: "MCP access isn't configured. Set OWNER_PASSWORD and PUBLIC_BASE_URL (Claude apps) or MCP_BEARER_TOKEN.",
+        });
+      }),
+  );
 
   router.post("/", express.json({ limit: "15mb" }), async (req: Request, res: Response) => {
     const server = buildMcpServer(ctx);
