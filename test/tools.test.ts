@@ -24,10 +24,12 @@ describe("MCP tools", () => {
     const t = await setup();
     const { tools } = await t.mcp.listTools();
     expect(tools.map((x) => x.name).filter((n) => n.startsWith("whatsapp_")).sort()).toEqual([
-      "whatsapp_create_template", "whatsapp_delete_template", "whatsapp_download_media", "whatsapp_find_contacts",
-      "whatsapp_get_contact", "whatsapp_get_messages", "whatsapp_list_conversations", "whatsapp_list_templates",
-      "whatsapp_mark_read", "whatsapp_react", "whatsapp_search_messages", "whatsapp_send_buttons",
-      "whatsapp_send_location", "whatsapp_send_media", "whatsapp_send_template", "whatsapp_send_text",
+      "whatsapp_approve_drafts", "whatsapp_cancel_pending", "whatsapp_create_template", "whatsapp_delete_template",
+      "whatsapp_download_media", "whatsapp_draft_message", "whatsapp_find_contacts", "whatsapp_get_contact",
+      "whatsapp_get_messages", "whatsapp_list_conversations", "whatsapp_list_drafts", "whatsapp_list_templates",
+      "whatsapp_mark_read", "whatsapp_react", "whatsapp_schedule_message", "whatsapp_search_messages",
+      "whatsapp_send_buttons", "whatsapp_send_location", "whatsapp_send_media", "whatsapp_send_template",
+      "whatsapp_send_text",
     ]);
     expect(tools.find((x) => x.name === "whatsapp_get_messages")!.annotations?.readOnlyHint).toBe(true);
     expect(tools.find((x) => x.name === "whatsapp_delete_template")!.annotations?.destructiveHint).toBe(true);

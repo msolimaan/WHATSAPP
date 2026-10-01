@@ -38,3 +38,19 @@ export function cardDate(ms: number, timeZone: string): string {
     .format(new Date(ms))
     .replace("Sept", "Sep");
 }
+
+/**
+ * Reads a time you'd type: "2026-10-02 09:30" or "2026-10-02T09:30" in your time zone,
+ * or any ISO time with an offset ("…Z", "…-03:00"). Returns ms, or NaN if unreadable.
+ */
+export function parseLocalTime(input: string, timeZone: string): number {
+  const s = input.trim();
+  if (/[zZ]$|[+-]\d\d:?\d\d$/.test(s)) return Date.parse(s);
+  const m = s.match(/^(\d{4})-(\d{2})-(\d{2})(?:[ T](\d{1,2}):(\d{2}))?$/);
+  if (!m) return Number.NaN;
+  const [, y, mo, d, h = "9", mi = "0"] = m;
+  const guess = Date.UTC(+y, +mo - 1, +d, +h, +mi);
+  let t = guess - offsetMs(guess, timeZone);
+  t = guess - offsetMs(t, timeZone);
+  return t;
+}

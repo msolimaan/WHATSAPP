@@ -1,5 +1,6 @@
 import type { Config } from "../config.js";
 import type { CrmSync } from "../crm/sync.js";
+import type { FollowupEngine } from "../followups/engine.js";
 import type { EventBus } from "../events/bus.js";
 import type { Store } from "../store/store.js";
 import type { WhatsAppClient } from "../whatsapp/client.js";
@@ -11,6 +12,7 @@ export interface ToolContext {
   bus: EventBus;
   client: WhatsAppClient;
   messenger: Messenger;
+  followups: FollowupEngine;
   /** Present when Trello is configured. */
   crm?: CrmSync;
 }

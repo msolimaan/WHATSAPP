@@ -8,12 +8,14 @@ import { Store } from "../src/store/store.js";
 import { providerFor, WhatsAppClient } from "../src/whatsapp/client.js";
 import { Messenger } from "../src/whatsapp/messenger.js";
 import type { CrmSync } from "../src/crm/sync.js";
+import { FollowupEngine } from "../src/followups/engine.js";
 
 export const testConfig = (over: Partial<Config> = {}) =>
   ({
     PORT: 0, DATA_DIR: "", TIMEZONE: "America/Sao_Paulo", WA_PROVIDER: "360dialog", WA_API_KEY: "KEY",
     WA_GRAPH_VERSION: "v23.0", WEBHOOK_VERIFY_TOKEN: "verify-me", TRELLO_BOARD_ID: "B1",
-    CRM_FOLLOW_UP_DAYS: 3, CRM_NEW_LEAD_LOOKBACK_DAYS: 30, CRM_CHANNEL_LABEL: "WP", ...over,
+    CRM_FOLLOW_UP_DAYS: 3, CRM_NEW_LEAD_LOOKBACK_DAYS: 30, CRM_CHANNEL_LABEL: "WP",
+    FOLLOWUP_QUIET_HOURS: "20:00-08:30", FOLLOWUP_SKIP_WEEKENDS: false, FOLLOWUP_DAILY_TEMPLATE_CAP: 30, ...over,
   }) as Config;
 
 export interface FakeCall { method: string; url: string; body: unknown }
@@ -44,7 +46,8 @@ export async function setup(over: Partial<Config> = {}, withCrm?: (deps: { confi
   const client = new WhatsAppClient(providerFor(config), { fetch: wa.fetchFn, backoffMs: 1 });
   const messenger = new Messenger(client, store, bus);
   const crm = withCrm?.({ config, store, bus });
-  const ctx = { config, store, bus, client, messenger, crm };
+  const followups = new FollowupEngine({ config, store, bus, messenger, log: { info() {}, warn() {}, error() {} } });
+  const ctx = { config, store, bus, client, messenger, followups, crm };
   const server = buildMcpServer(ctx);
   const mcp = new Client({ name: "test", version: "1" });
   const [a, b] = InMemoryTransport.createLinkedPair();

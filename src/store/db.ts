@@ -90,6 +90,61 @@ const MIGRATIONS: string[] = [
     created_at INTEGER NOT NULL
   );
   `,
+  `
+  -- One-off messages: drafts waiting for your approval, and messages scheduled for later.
+  CREATE TABLE outbox (
+    id              INTEGER PRIMARY KEY AUTOINCREMENT,
+    wa_id           TEXT NOT NULL,
+    content         TEXT NOT NULL,            -- JSON {text?, template?}: text inside the 24h window, template outside
+    preview         TEXT NOT NULL,            -- what you'll see in lists
+    status          TEXT NOT NULL CHECK (status IN ('draft', 'scheduled', 'sent', 'failed', 'rejected', 'cancelled')),
+    send_at         INTEGER,                  -- unix seconds, for scheduled messages
+    cancel_on_reply INTEGER NOT NULL DEFAULT 1,
+    note            TEXT,
+    created_at      INTEGER NOT NULL,
+    updated_at      INTEGER NOT NULL,
+    message_id      TEXT,
+    error           TEXT
+  );
+  CREATE INDEX outbox_due ON outbox (status, send_at);
+
+  CREATE TABLE sequences (
+    id         INTEGER PRIMARY KEY AUTOINCREMENT,
+    name       TEXT NOT NULL UNIQUE,
+    steps      TEXT NOT NULL,                 -- JSON [{after_days, text?, template?}]
+    created_at INTEGER NOT NULL,
+    updated_at INTEGER NOT NULL
+  );
+
+  CREATE TABLE enrollments (
+    id           INTEGER PRIMARY KEY AUTOINCREMENT,
+    sequence_id  INTEGER NOT NULL REFERENCES sequences(id),
+    wa_id        TEXT NOT NULL,
+    vars         TEXT NOT NULL DEFAULT '{}',  -- JSON {name, first_name, company} for {{placeholders}}
+    card_id      TEXT,
+    step         INTEGER NOT NULL DEFAULT 0,  -- index of the next step to send
+    next_at      INTEGER,                     -- when the next step is due
+    last_sent_at INTEGER,
+    status       TEXT NOT NULL CHECK (status IN ('active', 'completed', 'stopped')),
+    stop_reason  TEXT,
+    created_at   INTEGER NOT NULL,
+    updated_at   INTEGER NOT NULL
+  );
+  CREATE UNIQUE INDEX enrollments_one_active ON enrollments (sequence_id, wa_id) WHERE status = 'active';
+  CREATE INDEX enrollments_due ON enrollments (status, next_at);
+
+  -- What the follow-up engine did, for reports.
+  CREATE TABLE followup_events (
+    id            INTEGER PRIMARY KEY AUTOINCREMENT,
+    at            INTEGER NOT NULL,
+    wa_id         TEXT NOT NULL,
+    enrollment_id INTEGER,
+    outbox_id     INTEGER,
+    kind          TEXT NOT NULL CHECK (kind IN ('sent', 'skipped', 'stopped', 'failed', 'cancelled', 'opted_out')),
+    detail        TEXT NOT NULL
+  );
+  CREATE INDEX followup_events_by_time ON followup_events (at);
+  `,
 ];
 
 export function openDb(file: string): DB {

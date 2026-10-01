@@ -2,6 +2,7 @@ import { join } from "node:path";
 import { createApp } from "./app.js";
 import { loadConfig } from "./config.js";
 import { CrmSync } from "./crm/sync.js";
+import { FollowupEngine } from "./followups/engine.js";
 import { EventBus } from "./events/bus.js";
 import { openDb } from "./store/db.js";
 import { Store } from "./store/store.js";
@@ -14,6 +15,8 @@ const store = new Store(openDb(join(config.DATA_DIR, "whatsapp.db")));
 const bus = new EventBus();
 const client = new WhatsAppClient(providerFor(config));
 const messenger = new Messenger(client, store, bus);
+const followups = new FollowupEngine({ config, store, bus, messenger });
+followups.start();
 
 let crm: CrmSync | undefined;
 if (config.TRELLO_API_KEY && config.TRELLO_TOKEN) {
@@ -28,13 +31,14 @@ if (config.TRELLO_API_KEY && config.TRELLO_TOKEN) {
   console.log("crm: Trello not configured; CRM sync is off");
 }
 
-const server = createApp({ config, store, bus, client, messenger, crm }).listen(config.PORT, () => {
+const server = createApp({ config, store, bus, client, messenger, followups, crm }).listen(config.PORT, () => {
   console.log(`whatsapp-mcp listening on :${config.PORT} (provider: ${config.WA_PROVIDER})`);
 });
 
 for (const signal of ["SIGINT", "SIGTERM"] as const) {
   process.on(signal, () => {
     crm?.stop();
+    followups.stop();
     server.close(() => {
       store.db.close();
       process.exit(0);

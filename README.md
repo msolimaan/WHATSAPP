@@ -4,8 +4,8 @@ Connects Claude to your WhatsApp Business number through the official Cloud API
 (Coexistence via a Meta partner such as 360dialog, or Meta directly), and keeps the
 **Inhouse Creatives LEADS** Trello board in sync automatically.
 
-> Status: **stage 3 of 7.** Webhook intake, message store, WhatsApp tools and the Trello sync work.
-> Follow-up sequences, OAuth and deployment come in the next stages.
+> Status: **stage 4 of 7.** Webhook intake, message store, WhatsApp tools, the Trello sync and
+> follow-ups work. OAuth and deployment come in the next stages.
 
 ## What works now
 - `POST /webhook/<secret>` receives these webhooks, stores them, and skips duplicates:
@@ -58,6 +58,27 @@ The server keeps the **Inhouse Creatives LEADS** board in step with WhatsApp:
 - **Starts in preview mode.** `crm_preview_sync` lists every change the history implies. `crm_apply_sync` applies it and turns the sync live. `crm_set_mode` pauses or resumes it.
 - **Overrides:** `crm_link_number_to_card` ties a number to a card, or marks it "not a lead".
 - **Daily report:** `crm_daily_report` covers who's waiting on you, what moved, follow-ups due (including "follow up again"), automatic replies, numbers on two cards, and chats with no card. The `morning_whatsapp_review` prompt runs the whole routine.
+
+## Follow-ups
+**Drafts (the default).**
+1. Claude prepares a message with `whatsapp_draft_message`.
+2. You review it (`whatsapp_list_drafts`).
+3. `whatsapp_approve_drafts` sends it, or schedules it.
+
+**Scheduled messages.** `whatsapp_schedule_message` sends at a set local time and is cancelled automatically if they write first.
+
+**Sequences.**
+- `followup_create_sequence` sets up steps, e.g. a template after 3 days, another after 4 more.
+- `followup_enroll` adds leads by contact or a whole Trello list, with `{{name}}`, `{{first_name}}` and `{{company}}` read from the card. It always previews before confirming.
+- A lead leaves the sequence when they reply (away messages don't count), opt out, or **you message them from your phone**.
+
+**Text or template.** Every follow-up can carry both. Text is used while their 24h window is open, the template otherwise. Placeholders that can't be filled are never sent.
+
+**Limits on automatic sends:**
+- `FOLLOWUP_QUIET_HOURS` (default 20:00–08:30) and optional `FOLLOWUP_SKIP_WEEKENDS`.
+- `FOLLOWUP_DAILY_TEMPLATE_CAP` (default 30 paid templates a day).
+
+**Opt-outs.** "Parar", "STOP", "não tenho interesse", "not interested" and Arabic equivalents mark the contact opted out, stop everything, and block future templates.
 
 ## Develop
 ```bash

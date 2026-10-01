@@ -35,6 +35,18 @@ const schema = z
     CRM_NEW_LEAD_LOOKBACK_DAYS: z.coerce.number().int().positive().default(30),
     CRM_CHANNEL_LABEL: z.string().default("WP"),
 
+    // Automatic follow-ups (sequences). Quiet hours are local time; nothing automatic is sent inside them.
+    FOLLOWUP_QUIET_HOURS: z
+      .string()
+      .regex(/^([01]\d|2[0-3]):[0-5]\d-([01]\d|2[0-3]):[0-5]\d$/, 'use "HH:MM-HH:MM", e.g. 20:00-08:30')
+      .default("20:00-08:30"),
+    FOLLOWUP_SKIP_WEEKENDS: z
+      .enum(["true", "false"])
+      .default("false")
+      .transform((v) => v === "true"),
+    // Most paid template messages the automation may send per day (protects your Meta bill).
+    FOLLOWUP_DAILY_TEMPLATE_CAP: z.coerce.number().int().min(0).default(30),
+
     // Webhook authentication. Meta signs with the app secret (X-Hub-Signature-256).
     // Providers that don't sign must post to /webhook/<WEBHOOK_PATH_SECRET>.
     WA_APP_SECRET: z.string().optional(),

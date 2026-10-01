@@ -31,6 +31,7 @@ export async function dailyReport(
   const tz = config.TIMEZONE;
   const nowMs = (deps.now ?? Date.now)();
   const since = Math.floor(nowMs / 1000) - hours * 3600;
+  const failedFollowups: string[] = [];
   const out: string[] = [`# WhatsApp & CRM report: last ${hours}h (to ${formatTime(nowMs / 1000, tz)}, ${tz})`];
 
   let board: BoardIndex | undefined;
@@ -77,7 +78,8 @@ export async function dailyReport(
   for (const { wa_id } of recent) {
     const chat = chatFor(store.db, [wa_id]);
     const last = meaningful(chat).at(-1);
-    if (last?.direction === "in") waiting.push({ waId: wa_id, at: last.timestamp, body: last.body });
+    // Someone who asked you to stop isn't waiting on a reply.
+    if (last?.direction === "in" && !store.getContact(wa_id)?.opted_out) waiting.push({ waId: wa_id, at: last.timestamp, body: last.body });
     for (const m of chat) {
       if (m.timestamp >= since && isAutoReply(m, chat)) autoReplies.push({ waId: wa_id, body: m.body });
     }
@@ -104,6 +106,33 @@ export async function dailyReport(
         ? `- ➕ ${a.card_name} → ${a.to_list} (${a.reason})`
         : `- ${a.card_name}: ${a.from_list} → ${a.to_list} (${a.reason})`,
     );
+  }
+
+  // ---- automatic follow-ups and drafts
+  {
+    const endOfToday = Math.floor(localDayAt(nowMs, 0, tz, 1).getTime() / 1000);
+    const drafts = (store.db.prepare(`SELECT COUNT(*) AS n FROM outbox WHERE status = 'draft'`).get() as { n: number }).n;
+    const scheduled = store.db
+      .prepare(`SELECT wa_id, send_at, preview FROM outbox WHERE status = 'scheduled' AND send_at < ? ORDER BY send_at`)
+      .all(endOfToday) as { wa_id: string; send_at: number; preview: string }[];
+    const steps = store.db
+      .prepare(
+        `SELECT e.wa_id, e.next_at, e.step, s.name FROM enrollments e JOIN sequences s ON s.id = e.sequence_id
+         WHERE e.status = 'active' AND e.next_at < ? ORDER BY e.next_at`,
+      )
+      .all(endOfToday) as { wa_id: string; next_at: number; step: number; name: string }[];
+    const events = store.db
+      .prepare(`SELECT wa_id, kind, detail FROM followup_events WHERE at >= ? ORDER BY at`)
+      .all(since) as { wa_id: string; kind: string; detail: string }[];
+    const sent = events.filter((e) => e.kind === "sent").length;
+    const stopped = events.filter((e) => e.kind === "stopped" || e.kind === "opted_out");
+    out.push("", "## Follow-ups");
+    out.push(`- Drafts waiting for your approval: ${drafts}${drafts ? " (whatsapp_list_drafts)" : ""}`);
+    out.push(`- Sent automatically in this period: ${sent}`);
+    for (const s of scheduled) out.push(`- Scheduled ${formatTime(s.send_at, tz)} → ${who(s.wa_id)}: ${snippet(s.preview, 60)}`);
+    for (const s of steps) out.push(`- Sequence "${s.name}" step ${s.step + 1} → ${who(s.wa_id)} at ${formatTime(s.next_at, tz)}`);
+    for (const e of stopped) out.push(`- ${e.kind === "opted_out" ? "🚫 Opted out" : "Left sequence"}: ${who(e.wa_id)} (${snippet(e.detail, 60)})`);
+    for (const e of events.filter((x) => x.kind === "failed")) failedFollowups.push(`Follow-up to ${who(e.wa_id)} failed: ${snippet(e.detail, 120)}`);
   }
 
   // ---- follow-ups due
@@ -138,7 +167,7 @@ export async function dailyReport(
   }
 
   // ---- needs attention
-  const attention: string[] = [];
+  const attention: string[] = [...failedFollowups];
   if (sync && sync.mode === "preview") {
     attention.push("The Trello sync is in PREVIEW mode, so nothing changes on Trello yet. Run crm_preview_sync, review it, then crm_apply_sync.");
   }

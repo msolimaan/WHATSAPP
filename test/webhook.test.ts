@@ -7,6 +7,7 @@ import { openDb } from "../src/store/db.js";
 import { Store } from "../src/store/store.js";
 import { providerFor, WhatsAppClient } from "../src/whatsapp/client.js";
 import { Messenger } from "../src/whatsapp/messenger.js";
+import { FollowupEngine } from "../src/followups/engine.js";
 import { processWebhook } from "../src/webhook/process.js";
 import { sign } from "../src/webhook/signature.js";
 import * as f from "./fixtures.js";
@@ -91,7 +92,8 @@ describe("processWebhook", () => {
 
 function deps(config: Config) {
   const client = new WhatsAppClient(providerFor(config));
-  return { config, store, bus, client, messenger: new Messenger(client, store, bus) };
+  const messenger = new Messenger(client, store, bus);
+  return { config, store, bus, client, messenger, followups: new FollowupEngine({ config, store, bus, messenger }) };
 }
 
 describe("webhook HTTP endpoint", () => {
