@@ -63,6 +63,33 @@ const MIGRATIONS: string[] = [
     value TEXT NOT NULL
   );
   `,
+  `
+  -- Everything the CRM sync did (or tried) on Trello, for the daily report and auditing.
+  CREATE TABLE crm_actions (
+    id         INTEGER PRIMARY KEY AUTOINCREMENT,
+    at         INTEGER NOT NULL,
+    kind       TEXT NOT NULL CHECK (kind IN ('move', 'create', 'due')),
+    card_id    TEXT,
+    card_name  TEXT,
+    wa_id      TEXT,
+    from_list  TEXT,
+    to_list    TEXT,
+    reason     TEXT NOT NULL,
+    trigger    TEXT NOT NULL CHECK (trigger IN ('message', 'overdue', 'preview')),
+    ok         INTEGER NOT NULL,
+    error      TEXT
+  );
+  CREATE INDEX crm_actions_by_time ON crm_actions (at);
+
+  -- Manual decisions that override matching by the number on the card.
+  -- card_id NULL means "never create a card for this number" (friends, suppliers…).
+  CREATE TABLE crm_links (
+    phone_key  TEXT PRIMARY KEY,
+    card_id    TEXT,
+    note       TEXT,
+    created_at INTEGER NOT NULL
+  );
+  `,
 ];
 
 export function openDb(file: string): DB {

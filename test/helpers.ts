@@ -7,11 +7,13 @@ import { openDb } from "../src/store/db.js";
 import { Store } from "../src/store/store.js";
 import { providerFor, WhatsAppClient } from "../src/whatsapp/client.js";
 import { Messenger } from "../src/whatsapp/messenger.js";
+import type { CrmSync } from "../src/crm/sync.js";
 
 export const testConfig = (over: Partial<Config> = {}) =>
   ({
     PORT: 0, DATA_DIR: "", TIMEZONE: "America/Sao_Paulo", WA_PROVIDER: "360dialog", WA_API_KEY: "KEY",
-    WA_GRAPH_VERSION: "v23.0", WEBHOOK_VERIFY_TOKEN: "verify-me", ...over,
+    WA_GRAPH_VERSION: "v23.0", WEBHOOK_VERIFY_TOKEN: "verify-me", TRELLO_BOARD_ID: "B1",
+    CRM_FOLLOW_UP_DAYS: 3, CRM_NEW_LEAD_LOOKBACK_DAYS: 30, CRM_CHANNEL_LABEL: "WP", ...over,
   }) as Config;
 
 export interface FakeCall { method: string; url: string; body: unknown }
@@ -34,14 +36,15 @@ export function fakeWhatsApp() {
   return { calls, fetchFn, on: (frag: string, res: () => Response) => routes.unshift([frag, res]) };
 }
 
-export async function setup(over: Partial<Config> = {}) {
+export async function setup(over: Partial<Config> = {}, withCrm?: (deps: { config: Config; store: Store; bus: EventBus }) => CrmSync) {
   const config = testConfig(over);
   const store = new Store(openDb(":memory:"));
   const bus = new EventBus();
   const wa = fakeWhatsApp();
   const client = new WhatsAppClient(providerFor(config), { fetch: wa.fetchFn, backoffMs: 1 });
   const messenger = new Messenger(client, store, bus);
-  const ctx = { config, store, bus, client, messenger };
+  const crm = withCrm?.({ config, store, bus });
+  const ctx = { config, store, bus, client, messenger, crm };
   const server = buildMcpServer(ctx);
   const mcp = new Client({ name: "test", version: "1" });
   const [a, b] = InMemoryTransport.createLinkedPair();

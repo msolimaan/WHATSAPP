@@ -3,6 +3,7 @@ import { StreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/
 import express, { type Request, type Response, type Router } from "express";
 import { safeEqual } from "../webhook/signature.js";
 import type { ToolContext } from "./context.js";
+import { registerCrmTools } from "./tools/crm.js";
 import { registerInboxTools } from "./tools/inbox.js";
 import { registerSendTools } from "./tools/send.js";
 import { registerTemplateTools } from "./tools/templates.js";
@@ -11,13 +12,17 @@ const INSTRUCTIONS = `This server is the owner's WhatsApp Business number (Inhou
 - Messages typed on the owner's phone and messages sent here appear in the same chats.
 - Free text only works within 24h of the contact's last message; otherwise use an approved template.
 - Before sending anything, show the owner the exact text and recipient and get a clear yes, unless they already told you exactly what to send.
-- Message ids look like ‹wamid…›; pass them without the brackets.`;
+- Message ids look like ‹wamid…›; pass them without the brackets.
+- Leads live on the Trello board "Inhouse Creatives LEADS". The server moves cards automatically
+  (Ready to Contact → Contacted → Follow Up / Replied) and creates cards for unknown numbers that write in.
+  It never edits card descriptions: when asked to update a card's STATUS or history, use the Trello tools.`;
 
 export function buildMcpServer(ctx: ToolContext): McpServer {
-  const server = new McpServer({ name: "whatsapp-mcp", version: "0.2.0" }, { instructions: INSTRUCTIONS });
+  const server = new McpServer({ name: "whatsapp-mcp", version: "0.3.0" }, { instructions: INSTRUCTIONS });
   registerInboxTools(server, ctx);
   registerSendTools(server, ctx);
   registerTemplateTools(server, ctx);
+  registerCrmTools(server, ctx);
   return server;
 }
 

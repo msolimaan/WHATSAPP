@@ -24,6 +24,17 @@ const schema = z
     // own messages from your leads' when a payload doesn't say.
     WA_BUSINESS_NUMBER: z.string().regex(/^\d{8,15}$/, "digits only, with country code").optional(),
 
+    // Trello CRM sync. Leave TRELLO_API_KEY empty to run without it.
+    TRELLO_API_KEY: z.string().optional(),
+    TRELLO_TOKEN: z.string().optional(),
+    // Board id or short link (the part after /b/ in the board URL).
+    TRELLO_BOARD_ID: z.string().default("6a5915aa978c66f85fe84d30"),
+    // A lead in Contacted with no reply after this many days moves to Follow Up.
+    CRM_FOLLOW_UP_DAYS: z.coerce.number().positive().default(3),
+    // In the first preview, unknown numbers that wrote within this many days get a card.
+    CRM_NEW_LEAD_LOOKBACK_DAYS: z.coerce.number().int().positive().default(30),
+    CRM_CHANNEL_LABEL: z.string().default("WP"),
+
     // Webhook authentication. Meta signs with the app secret (X-Hub-Signature-256).
     // Providers that don't sign must post to /webhook/<WEBHOOK_PATH_SECRET>.
     WA_APP_SECRET: z.string().optional(),
@@ -33,6 +44,9 @@ const schema = z
   .superRefine((c, ctx) => {
     if (c.WA_PROVIDER === "meta" && !c.WA_PHONE_NUMBER_ID) {
       ctx.addIssue({ code: "custom", path: ["WA_PHONE_NUMBER_ID"], message: "required when WA_PROVIDER=meta" });
+    }
+    if (Boolean(c.TRELLO_API_KEY) !== Boolean(c.TRELLO_TOKEN)) {
+      ctx.addIssue({ code: "custom", path: ["TRELLO_TOKEN"], message: "set both TRELLO_API_KEY and TRELLO_TOKEN, or neither" });
     }
     if (!c.WA_APP_SECRET && !c.WEBHOOK_PATH_SECRET) {
       ctx.addIssue({

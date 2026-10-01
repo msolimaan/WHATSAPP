@@ -23,7 +23,7 @@ describe("MCP tools", () => {
   it("lists every tool with annotations", async () => {
     const t = await setup();
     const { tools } = await t.mcp.listTools();
-    expect(tools.map((x) => x.name).sort()).toEqual([
+    expect(tools.map((x) => x.name).filter((n) => n.startsWith("whatsapp_")).sort()).toEqual([
       "whatsapp_create_template", "whatsapp_delete_template", "whatsapp_download_media", "whatsapp_find_contacts",
       "whatsapp_get_contact", "whatsapp_get_messages", "whatsapp_list_conversations", "whatsapp_list_templates",
       "whatsapp_mark_read", "whatsapp_react", "whatsapp_search_messages", "whatsapp_send_buttons",
@@ -155,7 +155,7 @@ describe("MCP tools", () => {
     t.wa.on("/MEDIA1", () => Response.json({ url: "https://lookaside.fbsbx.com/img?x=1", mime_type: "image/jpeg" }));
     t.wa.on("/img?x=1", () => new Response(new Uint8Array([255, 216, 255])));
     const r = await t.call("whatsapp_download_media", { message_id: "wamid.IMG1" });
-    const img = (r.content as { type: string; data?: string; mimeType?: string }[]).find((c) => c.type === "image")!;
+    const img = ((r as { content: unknown }).content as { type: string; data?: string; mimeType?: string }[]).find((c) => c.type === "image")!;
     expect(img).toMatchObject({ mimeType: "image/jpeg", data: Buffer.from([255, 216, 255]).toString("base64") });
   });
 

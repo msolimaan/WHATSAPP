@@ -4,8 +4,8 @@ Connects Claude to your WhatsApp Business number through the official Cloud API
 (Coexistence via a Meta partner such as 360dialog, or Meta directly), and keeps the
 **Inhouse Creatives LEADS** Trello board in sync automatically.
 
-> Status: **stage 2 of 7.** Webhook intake, message store and the WhatsApp tools work.
-> Trello sync, follow-ups and OAuth come in the next stages.
+> Status: **stage 3 of 7.** Webhook intake, message store, WhatsApp tools and the Trello sync work.
+> Follow-up sequences, OAuth and deployment come in the next stages.
 
 ## What works now
 - `POST /webhook/<secret>` receives these webhooks, stores them, and skips duplicates:
@@ -40,6 +40,24 @@ people who opted out, and stores the message so it shows in the chat history.
 
 Until OAuth lands (stage 5), `/mcp` needs `Authorization: Bearer $MCP_BEARER_TOKEN`, e.g.
 `claude mcp add --transport http whatsapp https://<host>/mcp --header "Authorization: Bearer <token>"`.
+
+## Trello CRM sync
+The server keeps the **Inhouse Creatives LEADS** board in step with WhatsApp:
+
+| When | Card moves |
+|---|---|
+| You message a lead (from your phone or through Claude) | Leads / Ready to Contact → **Contacted** |
+| A lead replies | Leads / Ready to Contact / Contacted / Follow Up → **Replied** |
+| A Contacted lead is quiet for `CRM_FOLLOW_UP_DAYS` (3) | → **Follow Up**, due today 09:00 |
+| An unknown number writes in | New card in **Leads**, labelled WP and by market |
+
+- **Forward only:** cards in Replied, Meeting, Won and Dead never move, and descriptions are never edited.
+- **How cards are matched:** by the WhatsApp number written on the card (`WHATSAPP: +55 …`, `WhatsApp verificado: …`, any `wa.me/…` link). Numbers without a `+` country code are ignored.
+- **Older Brazilian ids:** ids without the mobile 9 match their card.
+- **Not counted as replies:** Business-app greeting and away messages (pt/en/es/ar, or an instant first answer), and reactions.
+- **Starts in preview mode.** `crm_preview_sync` lists every change the history implies. `crm_apply_sync` applies it and turns the sync live. `crm_set_mode` pauses or resumes it.
+- **Overrides:** `crm_link_number_to_card` ties a number to a card, or marks it "not a lead".
+- **Daily report:** `crm_daily_report` covers who's waiting on you, what moved, follow-ups due (including "follow up again"), automatic replies, numbers on two cards, and chats with no card. The `morning_whatsapp_review` prompt runs the whole routine.
 
 ## Develop
 ```bash

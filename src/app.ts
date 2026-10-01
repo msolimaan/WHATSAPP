@@ -1,5 +1,6 @@
 import express, { type Express } from "express";
 import type { Config } from "./config.js";
+import type { CrmSync } from "./crm/sync.js";
 import type { EventBus } from "./events/bus.js";
 import { mcpRouter } from "./mcp/server.js";
 import type { Store } from "./store/store.js";
@@ -13,6 +14,7 @@ export interface AppDeps {
   bus: EventBus;
   client: WhatsAppClient;
   messenger: Messenger;
+  crm?: CrmSync;
 }
 
 export function createApp(deps: AppDeps): Express {
