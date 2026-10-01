@@ -42,6 +42,14 @@ describe("phone numbers on cards", () => {
     expect(phoneKey("+971 56 000 3333")).toBe("971560003333");
   });
 
+  it("lists the forms a WhatsApp id can take", async () => {
+    const { phoneVariants } = await import("../src/crm/phones.js");
+    expect(phoneVariants("+55 11 99000-1111")).toEqual(["5511990001111", "551190001111"]);
+    expect(phoneVariants("551190001111")).toEqual(["551190001111", "5511990001111"]);
+    expect(phoneVariants("551140006666")).toEqual(["551140006666"]); // landline: no 9 to add
+    expect(phoneVariants("971560003333")).toEqual(["971560003333"]);
+  });
+
   it("formats numbers and picks the market label", () => {
     expect(displayPhone("5511990001111")).toBe("+55 11 99000-1111");
     expect(displayPhone("971560003333")).toBe("+971560003333");

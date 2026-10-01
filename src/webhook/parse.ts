@@ -1,3 +1,4 @@
+import { phoneKey } from "../crm/phones.js";
 import type { NewMessage } from "../store/store.js";
 
 // Shapes of the Cloud API webhook payloads we use. Everything else is kept in `raw`.
@@ -148,7 +149,7 @@ function parseHistory(v: ChangeValue, ours: string, items: ParsedItem[]): void {
     for (const thread of h.threads ?? []) {
       const waId = digits(thread.id);
       for (const m of thread.messages ?? []) {
-        const outbound = ours !== "" && digits(m.from) === ours;
+        const outbound = ours !== "" && phoneKey(m.from) === phoneKey(ours);
         const msg = toMessage(m, outbound ? "out" : "in", "history", waId);
         if (outbound && m.history_context?.status) msg.status = m.history_context.status.toLowerCase();
         items.push({ kind: "message", message: msg });

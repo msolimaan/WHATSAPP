@@ -89,6 +89,27 @@ describe("MCP tools", () => {
     expect(seen).toEqual(["out:api:false"]);
   });
 
+  it("uses the id WhatsApp knows a Brazilian lead by, so the chat and window stay right", async () => {
+    const t = await setup();
+    const OLD = "551190001111"; // what WhatsApp sends for +55 11 99000-1111
+    t.store.recordMessage({ id: "in-old", waId: OLD, direction: "in", source: "webhook", type: "text", body: "Oi!", timestamp: NOW - 600, raw: {} });
+    const r = await withNow(() => t.call("whatsapp_send_text", { to: "+55 11 99000-1111", body: "Oi, tudo bem?" }));
+    expect(r.isError).toBe(false);
+    expect(t.wa.calls[0].body).toMatchObject({ to: OLD });
+    expect((await t.call("whatsapp_get_messages", { contact: "+55 11 99000-1111" })).text).toContain("Oi, tudo bem?");
+  });
+
+  it("reports a send as done even if something reacting to it breaks", async () => {
+    const t = await seeded();
+    t.bus.on("message", () => {
+      throw new Error("listener bug");
+    });
+    const r = await withNow(() => t.call("whatsapp_send_text", { to: "5511990001111", body: "Segue o exemplo" }));
+    expect(r.isError).toBe(false);
+    expect(r.text).toContain("Sent text");
+    expect(t.wa.calls).toHaveLength(1);
+  });
+
   it("refuses free text when the window is closed, without calling WhatsApp", async () => {
     const t = await seeded();
     const r = await withNow(async () => {

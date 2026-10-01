@@ -8,7 +8,17 @@ const schema = z
     PUBLIC_BASE_URL: z.url().optional(),
     DATA_DIR: z.string().default("./data"),
     // Your time zone, used for dates Claude shows you and (later) quiet hours.
-    TIMEZONE: z.string().default("America/Sao_Paulo"),
+    TIMEZONE: z
+      .string()
+      .default("America/Sao_Paulo")
+      .refine((tz) => {
+        try {
+          new Intl.DateTimeFormat("en", { timeZone: tz });
+          return true;
+        } catch {
+          return false;
+        }
+      }, "not a time zone name; use one like America/Sao_Paulo or Asia/Dubai"),
     // Static access for clients that support custom headers (Claude Code):
     // "Authorization: Bearer <token>". Optional when OAuth is set up.
     MCP_BEARER_TOKEN: z.string().min(32, "use at least 32 random characters").optional(),

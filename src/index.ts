@@ -41,6 +41,8 @@ for (const signal of ["SIGINT", "SIGTERM"] as const) {
   process.on(signal, () => {
     crm?.stop();
     followups.stop();
+    // Don't let open keep-alive connections hold up a redeploy.
+    setTimeout(() => process.exit(0), 10_000).unref();
     server.close(() => {
       store.db.close();
       process.exit(0);

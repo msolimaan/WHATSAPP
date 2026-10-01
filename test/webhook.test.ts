@@ -66,6 +66,14 @@ describe("processWebhook", () => {
     expect(processWebhook(store, bus, f.statuses("read", "wamid.UNKNOWN")).statuses).toBe(0);
   });
 
+  it("recognizes your own past messages even when the ids differ by Brazil's mobile 9", () => {
+    const payload = JSON.parse(JSON.stringify(f.history));
+    payload.entry[0].changes[0].value.metadata.display_phone_number = "55 11 94000-0000"; // business: 5511940000000
+    payload.entry[0].changes[0].value.history[0].threads[0].messages[0].from = "551140000000"; // old id, no 9
+    processWebhook(store, bus, payload);
+    expect(store.getMessage("wamid.H1")!.direction).toBe("out");
+  });
+
   it("backfills history in both directions and flags it as backfill", () => {
     const flags: boolean[] = [];
     bus.on("message", (_m, meta) => flags.push(meta.backfill));
@@ -133,13 +141,34 @@ describe("webhook HTTP endpoint", () => {
     expect(store.getMessage("wamid.IN1")).toBeDefined();
   });
 
-  it("still answers 200 for a payload it can't process, and keeps it for replay", async () => {
+  it("keeps storing and notifying when one listener breaks", async () => {
     const secret = "y".repeat(32);
+    const errors: string[] = [];
+    bus = new EventBus((err) => errors.push((err as Error).message));
     const app = createApp(deps({ ...base, WEBHOOK_PATH_SECRET: secret }));
-    bus.on("message", () => { throw new Error("listener bug"); });
+    const seen: string[] = [];
+    bus.on("message", () => {
+      throw new Error("listener bug");
+    });
+    bus.on("message", (m) => seen.push(m.id));
+    const both = { object: "whatsapp_business_account", entry: [...f.inboundText.entry, ...f.inboundImage.entry] };
+    await request(app).post(`/webhook/${secret}`).send(both).expect(200);
+    expect(store.getMessage("wamid.IN1")).toBeDefined();
+    expect(store.getMessage("wamid.IMG1")).toBeDefined();
+    expect(seen).toEqual(["wamid.IN1", "wamid.IMG1"]);
+    expect(errors).toEqual(["listener bug", "listener bug"]);
+  });
+
+  it("still answers 200 when storing fails, and keeps the payload for replay", async () => {
+    const secret = "z".repeat(32);
+    const app = createApp(deps({ ...base, WEBHOOK_PATH_SECRET: secret }));
+    store.recordMessage = () => {
+      throw new Error("disk full");
+    };
     await request(app).post(`/webhook/${secret}`).send(f.inboundText).expect(200);
-    const row = store.db.prepare("SELECT error FROM webhook_events").get() as { error: string };
-    expect(row.error).toContain("listener bug");
+    const row = store.db.prepare("SELECT payload, error FROM webhook_events").get() as { payload: string; error: string };
+    expect(row.error).toContain("disk full");
+    expect(JSON.parse(row.payload)).toEqual(f.inboundText);
   });
 
   it("reports health", async () => {

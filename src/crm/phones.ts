@@ -14,6 +14,20 @@ export function phoneKey(input: string): string {
   return d;
 }
 
+/**
+ * The forms a WhatsApp id for this number can take: Brazilian mobiles with and without the
+ * extra 9, Mexican numbers with and without the old "1". The input comes first.
+ */
+export function phoneVariants(input: string): string[] {
+  const d = input.replace(/\D/g, "");
+  const out = [d];
+  if (d.startsWith("55") && d.length === 13 && d[4] === "9") out.push(d.slice(0, 4) + d.slice(5));
+  if (d.startsWith("55") && d.length === 12 && /[6-9]/.test(d[4])) out.push(`${d.slice(0, 4)}9${d.slice(4)}`);
+  if (d.startsWith("521") && d.length === 13) out.push(`52${d.slice(3)}`);
+  if (d.startsWith("52") && d.length === 12) out.push(`521${d.slice(2)}`);
+  return out;
+}
+
 // "+55 11 94000 4444", "+971 56 000 3333", "+55 (11) 99000-5555"
 const INTERNATIONAL = /\+\s?\d[\d\s().-]{6,20}\d/g;
 // wa.me/5511990005555 (also inside ready-to-send links with ?text=…)

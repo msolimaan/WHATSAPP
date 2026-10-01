@@ -1,4 +1,5 @@
 import type { CallToolResult } from "@modelcontextprotocol/sdk/types.js";
+import { phoneVariants } from "../crm/phones.js";
 import { findContacts } from "../store/queries.js";
 import type { ContactRow, MessageRow, Store } from "../store/store.js";
 import { WhatsAppApiError } from "../whatsapp/errors.js";
@@ -60,7 +61,13 @@ export function resolveContact(store: Store, input: string): string {
   if (/^\+?[\d\s().-]+$/.test(trimmed)) {
     const d = trimmed.replace(/\D/g, "");
     if (d.length < 8 || d.length > 15) throw new ToolError(`"${input}" isn't a full phone number. Include the country code, e.g. +55 11 99000-1111.`);
-    return d;
+    // Use the id WhatsApp already knows this line by (older Brazilian ids lack the mobile 9),
+    // so the chat isn't split and the 24h window is read correctly.
+    const known = phoneVariants(d)
+      .map((id) => store.getContact(id))
+      .filter((c): c is NonNullable<typeof c> => Boolean(c))
+      .sort((a, b) => (b.last_inbound_at ?? 0) - (a.last_inbound_at ?? 0) || (b.last_outbound_at ?? 0) - (a.last_outbound_at ?? 0));
+    return known[0]?.wa_id ?? d;
   }
   const matches = findContacts(store.db, trimmed, 6);
   if (matches.length === 1) return matches[0].wa_id;

@@ -12,4 +12,8 @@ describe("loadConfig", () => {
     const c = loadConfig({ WA_API_KEY: "k", WEBHOOK_PATH_SECRET: "a".repeat(24) });
     expect(c).toMatchObject({ WA_PROVIDER: "360dialog", PORT: 3000 });
   });
+  it("rejects a misspelled time zone at startup", () => {
+    expect(() => loadConfig({ WA_API_KEY: "k", WEBHOOK_PATH_SECRET: "a".repeat(24), TIMEZONE: "Sao Paulo" })).toThrow(/time zone/);
+    expect(loadConfig({ WA_API_KEY: "k", WEBHOOK_PATH_SECRET: "a".repeat(24), TIMEZONE: "Asia/Dubai" }).TIMEZONE).toBe("Asia/Dubai");
+  });
 });
