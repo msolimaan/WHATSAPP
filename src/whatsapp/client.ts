@@ -14,6 +14,27 @@ export interface Provider {
   /** Rewrites the download url from media metadata so it goes through the provider when needed. */
   downloadUrl(url: string): string;
   headers: Record<string, string>;
+  /** List and create message templates. Undefined when not configured (Meta needs the WABA id). */
+  templatesUrl?: string;
+  templateDeleteUrl?(name: string): string;
+}
+
+export interface Template {
+  id?: string;
+  name: string;
+  language: string;
+  status: string;
+  category: string;
+  rejected_reason?: string;
+  components: TemplateComponent[];
+}
+
+export interface TemplateComponent {
+  type: string;
+  format?: string;
+  text?: string;
+  buttons?: { type: string; text: string; url?: string; phone_number?: string }[];
+  example?: unknown;
 }
 
 export function providerFor(config: Config): Provider {
@@ -26,6 +47,11 @@ export function providerFor(config: Config): Provider {
       mediaInfoUrl: (id) => `${root}/${encodeURIComponent(id)}`,
       downloadUrl: (url) => url,
       headers: { Authorization: `Bearer ${config.WA_API_KEY}` },
+      ...(config.WA_BUSINESS_ACCOUNT_ID && {
+        templatesUrl: `${root}/${config.WA_BUSINESS_ACCOUNT_ID}/message_templates`,
+        templateDeleteUrl: (name: string) =>
+          `${root}/${config.WA_BUSINESS_ACCOUNT_ID}/message_templates?name=${encodeURIComponent(name)}`,
+      }),
     };
   }
   const base = (config.WA_BASE_URL ?? "https://waba-v2.360dialog.io").replace(/\/$/, "");
@@ -42,6 +68,8 @@ export function providerFor(config: Config): Provider {
       return u.toString();
     },
     headers: { "D360-API-KEY": config.WA_API_KEY },
+    templatesUrl: `${base}/v1/configs/templates`,
+    templateDeleteUrl: (name) => `${base}/v1/configs/templates/${encodeURIComponent(name)}`,
   };
 }
 
@@ -110,6 +138,39 @@ export class WhatsAppClient {
     const res = await this.request(this.provider.mediaUrl, { method: "POST", form });
     const data = (await res.json()) as { id: string };
     return data.id;
+  }
+
+  async listTemplates(): Promise<Template[]> {
+    const url = this.templatesUrlOrThrow();
+    const all: Template[] = [];
+    let next: string | undefined = url.includes("?") ? url : `${url}?limit=250`;
+    // Meta pages with paging.next; 360dialog returns everything as waba_templates.
+    for (let page = 0; next && page < 20; page++) {
+      const res = await this.request(next, { method: "GET" });
+      const data = (await res.json()) as { data?: Template[]; waba_templates?: Template[]; paging?: { next?: string } };
+      all.push(...(data.data ?? data.waba_templates ?? []));
+      next = data.paging?.next;
+    }
+    return all;
+  }
+
+  /** Submits a template for Meta review. Returns its id and initial status (usually PENDING). */
+  async createTemplate(template: Omit<Template, "status" | "id">): Promise<{ id?: string; status: string }> {
+    const res = await this.request(this.templatesUrlOrThrow(), { method: "POST", json: template });
+    const data = (await res.json()) as { id?: string; status?: string };
+    return { id: data.id, status: data.status ?? "PENDING" };
+  }
+
+  async deleteTemplate(name: string): Promise<void> {
+    if (!this.provider.templateDeleteUrl) this.templatesUrlOrThrow();
+    await this.request(this.provider.templateDeleteUrl!(name), { method: "DELETE" });
+  }
+
+  private templatesUrlOrThrow(): string {
+    if (!this.provider.templatesUrl) {
+      throw new WhatsAppApiError(0, undefined, "template management needs WA_BUSINESS_ACCOUNT_ID when WA_PROVIDER=meta");
+    }
+    return this.provider.templatesUrl;
   }
 
   private async request(

@@ -5,6 +5,8 @@ import type { Config } from "../src/config.js";
 import { EventBus } from "../src/events/bus.js";
 import { openDb } from "../src/store/db.js";
 import { Store } from "../src/store/store.js";
+import { providerFor, WhatsAppClient } from "../src/whatsapp/client.js";
+import { Messenger } from "../src/whatsapp/messenger.js";
 import { processWebhook } from "../src/webhook/process.js";
 import { sign } from "../src/webhook/signature.js";
 import * as f from "./fixtures.js";
@@ -87,6 +89,11 @@ describe("processWebhook", () => {
   });
 });
 
+function deps(config: Config) {
+  const client = new WhatsAppClient(providerFor(config));
+  return { config, store, bus, client, messenger: new Messenger(client, store, bus) };
+}
+
 describe("webhook HTTP endpoint", () => {
   const base = {
     PORT: 0, DATA_DIR: "", WA_PROVIDER: "360dialog", WA_API_KEY: "k", WA_GRAPH_VERSION: "v23.0",
@@ -94,13 +101,13 @@ describe("webhook HTTP endpoint", () => {
   } as Config;
 
   it("answers Meta's subscription check only with the right token", async () => {
-    const app = createApp({ config: { ...base, WA_APP_SECRET: "s" }, store, bus });
+    const app = createApp(deps({ ...base, WA_APP_SECRET: "s" }));
     await request(app).get("/webhook").query({ "hub.mode": "subscribe", "hub.verify_token": "verify-me", "hub.challenge": "42" }).expect(200, "42");
     await request(app).get("/webhook").query({ "hub.mode": "subscribe", "hub.verify_token": "nope", "hub.challenge": "42" }).expect(403);
   });
 
   it("accepts only correctly signed deliveries when an app secret is set", async () => {
-    const app = createApp({ config: { ...base, WA_APP_SECRET: "app-secret" }, store, bus });
+    const app = createApp(deps({ ...base, WA_APP_SECRET: "app-secret" }));
     const body = JSON.stringify(f.inboundText);
     await request(app).post("/webhook").set("Content-Type", "application/json").send(body).expect(401);
     await request(app).post("/webhook").set("Content-Type", "application/json").set("X-Hub-Signature-256", sign(body, "wrong")).send(body).expect(401);
@@ -110,7 +117,7 @@ describe("webhook HTTP endpoint", () => {
 
   it("requires the URL secret when one is set", async () => {
     const secret = "x".repeat(32);
-    const app = createApp({ config: { ...base, WEBHOOK_PATH_SECRET: secret }, store, bus });
+    const app = createApp(deps({ ...base, WEBHOOK_PATH_SECRET: secret }));
     await request(app).post("/webhook").send(f.inboundText).expect(404);
     await request(app).post("/webhook/wrong").send(f.inboundText).expect(404);
     await request(app).post(`/webhook/${secret}`).send(f.inboundText).expect(200);
@@ -119,7 +126,7 @@ describe("webhook HTTP endpoint", () => {
 
   it("still answers 200 for a payload it can't process, and keeps it for replay", async () => {
     const secret = "y".repeat(32);
-    const app = createApp({ config: { ...base, WEBHOOK_PATH_SECRET: secret }, store, bus });
+    const app = createApp(deps({ ...base, WEBHOOK_PATH_SECRET: secret }));
     bus.on("message", () => { throw new Error("listener bug"); });
     await request(app).post(`/webhook/${secret}`).send(f.inboundText).expect(200);
     const row = store.db.prepare("SELECT error FROM webhook_events").get() as { error: string };
@@ -128,7 +135,7 @@ describe("webhook HTTP endpoint", () => {
 
   it("reports health", async () => {
     processWebhook(store, bus, f.inboundText);
-    const app = createApp({ config: { ...base, WA_APP_SECRET: "s" }, store, bus });
+    const app = createApp(deps({ ...base, WA_APP_SECRET: "s" }));
     const res = await request(app).get("/health").expect(200);
     expect(res.body).toMatchObject({ ok: true, messages: 1 });
   });

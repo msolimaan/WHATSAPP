@@ -7,6 +7,10 @@ const schema = z
     PORT: z.coerce.number().int().positive().default(3000),
     PUBLIC_BASE_URL: z.url().optional(),
     DATA_DIR: z.string().default("./data"),
+    // Your time zone, used for dates Claude shows you and (later) quiet hours.
+    TIMEZONE: z.string().default("America/Sao_Paulo"),
+    // Temporary MCP access until OAuth lands: clients send "Authorization: Bearer <token>".
+    MCP_BEARER_TOKEN: z.string().min(32, "use at least 32 random characters").optional(),
 
     // "meta" talks to graph.facebook.com directly; "360dialog" to its Cloud API proxy.
     // Both use Meta's message and webhook formats.
