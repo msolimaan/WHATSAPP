@@ -16,4 +16,13 @@ describe("loadConfig", () => {
     expect(() => loadConfig({ WA_API_KEY: "k", WEBHOOK_PATH_SECRET: "a".repeat(24), TIMEZONE: "Sao Paulo" })).toThrow(/time zone/);
     expect(loadConfig({ WA_API_KEY: "k", WEBHOOK_PATH_SECRET: "a".repeat(24), TIMEZONE: "Asia/Dubai" }).TIMEZONE).toBe("Asia/Dubai");
   });
+  it("treats empty values as not set, like a copied .env.example", () => {
+    const c = loadConfig({
+      WA_API_KEY: "k", WEBHOOK_PATH_SECRET: "a".repeat(24),
+      WA_BUSINESS_NUMBER: "", PUBLIC_BASE_URL: "", OWNER_PASSWORD: "", MCP_BEARER_TOKEN: " ", TRELLO_API_KEY: "", TRELLO_TOKEN: "", WA_APP_SECRET: "",
+    });
+    expect(c.WA_BUSINESS_NUMBER).toBeUndefined();
+    expect(c.OWNER_PASSWORD).toBeUndefined();
+    expect(c.PORT).toBe(3000);
+  });
 });
