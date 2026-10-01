@@ -1,0 +1,42 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npm run typecheck
+      - run: npm test
+      - run: npm run build
+
+  docker:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build the image
+        run: docker build -t whatsapp-mcp .
+      - name: Start it and check /health
+        run: |
+          docker run -d --name app -p 3000:3000 \
+            -e WA_API_KEY=ci-placeholder \
+            -e WEBHOOK_PATH_SECRET=ci-placeholder-secret-0123456789 \
+            whatsapp-mcp
+          for i in $(seq 1 30); do
+            if curl -fsS http://localhost:3000/health; then exit 0; fi
+            sleep 1
+          done
+          docker logs app
+          exit 1
