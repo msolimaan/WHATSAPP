@@ -1,3 +1,4 @@
+import { existsSync } from "node:fs";
 import { join } from "node:path";
 import { createApp } from "./app.js";
 import { loadConfig } from "./config.js";
@@ -10,6 +11,8 @@ import { TrelloClient } from "./trello/client.js";
 import { providerFor, WhatsAppClient } from "./whatsapp/client.js";
 import { Messenger } from "./whatsapp/messenger.js";
 
+// Local runs read .env if there is one; hosted deployments use their own variables.
+if (existsSync(".env")) process.loadEnvFile(".env");
 const config = loadConfig();
 const store = new Store(openDb(join(config.DATA_DIR, "whatsapp.db")));
 const bus = new EventBus();
